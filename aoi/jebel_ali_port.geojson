@@ -1,0 +1,42 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "jebel_ali_port",
+    "centre_lat": 25.011,
+    "centre_lon": 55.061,
+    "size_km": 6.0,
+    "source": "Port of Jebel Ali, Dubai (DP World). Wikipedia: 25d00m41sN 55d03m40sE"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       55.031262,
+       24.984051
+      ],
+      [
+       55.090738,
+       24.984051
+      ],
+      [
+       55.090738,
+       25.037949
+      ],
+      [
+       55.031262,
+       25.037949
+      ],
+      [
+       55.031262,
+       24.984051
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

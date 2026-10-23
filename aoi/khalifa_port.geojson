@@ -1,0 +1,42 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "khalifa_port",
+    "centre_lat": 24.805,
+    "centre_lon": 54.66,
+    "size_km": 6.0,
+    "source": "Khalifa Port, Abu Dhabi (AD Ports). Centre ~24.80N 54.66E; ShipsGo AEKHL 24.7979N 54.6924E"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       54.630312,
+       24.778051
+      ],
+      [
+       54.689688,
+       24.778051
+      ],
+      [
+       54.689688,
+       24.831949
+      ],
+      [
+       54.630312,
+       24.831949
+      ],
+      [
+       54.630312,
+       24.778051
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

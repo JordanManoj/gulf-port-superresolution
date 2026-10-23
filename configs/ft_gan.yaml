@@ -1,0 +1,18 @@
+# Perceptual fine-tune (Real-ESRGAN recipe): L1 + VGG19 perceptual + U-Net SN discriminator.
+# Starts from the L1 fine-tuned generator (ESRGAN practice: PSNR-oriented warm start, then GAN).
+name: ft_gan
+init: ft_l1
+mode: gan
+init_d: weights/RealESRGAN_x4plus_netD.pth
+iters: 3000
+batch: 4
+lr_patch: 32
+lr_g: 5.0e-5
+lr_d: 5.0e-5
+w_pix: 1.0
+w_per: 1.0
+w_gan: 0.1
+val_every: 500
+n_val: 30
+seed: 0
+save_to: weights/finetuned_gan.pth

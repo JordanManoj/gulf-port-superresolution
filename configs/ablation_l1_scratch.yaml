@@ -1,0 +1,12 @@
+# Init ablation (build vs reuse): identical L1 fine-tuning budget, only the starting weights differ.
+name: ablation_l1_scratch
+init: scratch
+mode: l1
+iters: 1500
+batch: 8
+lr_patch: 32        # LR crop 32x32 px (320 m) -> HR 128x128 px at 2.5 m
+lr_g: 1.0e-4
+val_every: 250
+n_val: 30
+seed: 0
+save_to: weights/ablation_l1_scratch.pth

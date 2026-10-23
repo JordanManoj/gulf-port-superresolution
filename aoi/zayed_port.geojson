@@ -1,0 +1,42 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "zayed_port",
+    "centre_lat": 24.525,
+    "centre_lon": 54.377,
+    "size_km": 6.0,
+    "source": "Zayed Port / Mina Zayed, Abu Dhabi. Wikipedia: 24d31m31sN 54d22m37sE"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       54.347378,
+       24.498051
+      ],
+      [
+       54.406622,
+       24.498051
+      ],
+      [
+       54.406622,
+       24.551949
+      ],
+      [
+       54.347378,
+       24.551949
+      ],
+      [
+       54.347378,
+       24.498051
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
