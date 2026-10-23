@@ -15,9 +15,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCALE = 4
 # WorldStrat L2A tiffs hold 12 bands: B1 B2 B3 B4 B5 B6 B7 B8 B8A B9 B11 B12 -> RGB = B4,B3,B2
 RGB_IDX = [3, 2, 1]
-# Linear stretch reflectance -> 8 bit. 0.30 keeps bright Gulf sand/concrete from saturating
+# Linear stretch reflectance -> 8 bit. 0.40 = 99th percentile of Gulf-tile reflectance (2% clipped; 0.30 clipped 12%)
 # (Sen2Cor TCI uses 0.25, which clips desert scenes). Chosen from train-set percentiles (see DECISIONS.md).
-REFL_MAX = 0.30
+REFL_MAX = 0.40
 
 
 # --------------------------------------------------------------------------------------

@@ -116,6 +116,9 @@ def main():
     hr_idx, lr_idx = get_index("hr_dataset"), get_index("lr_dataset_l2a")
 
     jobs = []
+    # evaluation sets first, so a throttled/partial download still yields complete test sets
+    prio = {"gulf_test": 0, "test": 1, "val": 2, "train": 3}
+    sel = sel.sort_values("set", key=lambda c: c.map(prio), kind="stable")
     for t, revs in zip(sel.tile, sel.revisits):
         jobs.append(("hr_dataset", hr_idx[f"hr_dataset/{t}/{t}_rgb.png"], os.path.join(WS, "hr", f"{t}_rgb.png")))
         for n in revs:
@@ -138,6 +141,7 @@ def main():
             if done % 100 == 0:
                 print(f"  {done}/{len(jobs)}", flush=True)
     print(f"failed files: {failed}")
+    sel = sel.sort_index()
     sel.to_csv(os.path.join(WS, "subset.csv"), index=False)
     print("done ->", os.path.join(WS, "subset.csv"))
 

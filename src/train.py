@@ -7,6 +7,7 @@ Init:  realesrgan | satlas | scratch  (the build-vs-reuse ablation)
 
 Usage:  python src/train.py configs/ft_l1_realesrgan.yaml
 """
+import copy
 import json
 import os
 import random
@@ -138,6 +139,11 @@ def main(cfg_path):
         sd = torch.load(os.path.join(ROOT, WEIGHTS[cfg["init"]]), map_location="cpu", weights_only=False)
         G.load_state_dict(sd.get("params_ema", sd.get("params", sd)))
     optG = torch.optim.Adam(G.parameters(), lr=cfg["lr_g"], betas=(0.9, 0.99))
+    # cosine decay to 10 % of the start LR: big steps early, small steps at the end (val PSNR swung +-4 dB with a constant LR)
+    schedG = torch.optim.lr_scheduler.CosineAnnealingLR(optG, cfg["iters"], eta_min=cfg["lr_g"] * 0.1)
+    # EMA of generator weights (Real-ESRGAN uses 0.999): smooths step-to-step noise; we validate and save the EMA model
+    ema = copy.deepcopy(G).eval().requires_grad_(False)
+    ema_decay = cfg.get("ema", 0.999)
     gan = cfg["mode"] == "gan"
     if gan:
         D = UNetDiscriminatorSN().to(dev)
@@ -146,9 +152,8 @@ def main(cfg_path):
         optD = torch.optim.Adam(D.parameters(), lr=cfg["lr_d"], betas=(0.9, 0.99))
         percep = PerceptualLoss().to(dev)
         bce = nn.BCEWithLogitsLoss()
-    scaler = torch.cuda.amp.GradScaler()
-    log, best = [], -1
-    v_psnr, v_lpips = evaluate(G, val_paths, dev)
+    log, best = [], None
+    v_psnr, v_lpips = evaluate(ema, val_paths, dev)
     log.append(dict(it=0, val_psnr=v_psnr, val_lpips=v_lpips))
     print(f"[{name}] it 0 val PSNR {v_psnr:.2f} LPIPS {v_lpips:.3f}", flush=True)
     t0 = time.time()
@@ -156,9 +161,8 @@ def main(cfg_path):
         lr_b, hr_b = train.sample(cfg["batch"])
         lr_b, hr_b = lr_b.to(dev), hr_b.to(dev)
         # ---- generator step
-        with torch.autocast("cuda", dtype=torch.float16):
-            sr = G(lr_b)
-        sr = sr.float()
+        # fp32 on purpose: fp16 autocast gave NaN losses at ~50 its on the GTX 1650 (no tensor cores, little speed-up)
+        sr = G(lr_b)
         l_pix = F.l1_loss(sr, hr_b)
         loss = cfg.get("w_pix", 1.0) * l_pix
         if gan:
@@ -168,9 +172,12 @@ def main(cfg_path):
             l_gan = bce(D(sr), torch.ones_like(sr[:, :1]))
             loss = loss + cfg["w_per"] * l_per + cfg["w_gan"] * l_gan
         optG.zero_grad(set_to_none=True)
-        scaler.scale(loss).backward()
-        scaler.step(optG)
-        scaler.update()
+        loss.backward()
+        optG.step()
+        schedG.step()
+        with torch.no_grad():
+            for pe, pg in zip(ema.parameters(), G.parameters()):
+                pe.mul_(ema_decay).add_(pg.detach(), alpha=1 - ema_decay)
         # ---- discriminator step
         if gan:
             for p in D.parameters():
@@ -185,14 +192,14 @@ def main(cfg_path):
                 msg += f" l_per {l_per.item():.3f} l_gan {l_gan.item():.3f} l_d {l_d.item():.3f}"
             print(msg + f" ({(time.time() - t0) / it:.2f}s/it)", flush=True)
         if it % cfg["val_every"] == 0 or it == cfg["iters"]:
-            v_psnr, v_lpips = evaluate(G, val_paths, dev)
+            v_psnr, v_lpips = evaluate(ema, val_paths, dev)
             log.append(dict(it=it, val_psnr=v_psnr, val_lpips=v_lpips, l_pix=l_pix.item()))
             print(f"[{name}] it {it} val PSNR {v_psnr:.2f} LPIPS {v_lpips:.3f}", flush=True)
             # model selection: PSNR for the L1 model, LPIPS for the perceptual model
             score = -v_lpips if gan else v_psnr
-            if best == -1 or score > best:
+            if best is None or score > best:
                 best = score
-                torch.save({"params": G.state_dict(), "it": it}, os.path.join(ROOT, cfg["save_to"]))
+                torch.save({"params": ema.state_dict(), "it": it}, os.path.join(ROOT, cfg["save_to"]))
             json.dump(log, open(os.path.join(out_dir, "log.json"), "w"), indent=1)
     print(f"[{name}] done in {(time.time() - t0) / 60:.1f} min", flush=True)
 
