@@ -41,7 +41,7 @@ Target area: the Arabian Gulf, specifically Khalifa Port, Jebel Ali and Zayed Po
 
 ## 2. Research
 
-Full notes with sources are in [`docs/RESEARCH.md`](docs/RESEARCH.md). The points that shaped the design:
+Full notes with sources are in [`docs/RESEARCH.md`](docs/RESEARCH.md): how and where I searched (section 0), a model selection matrix covering every candidate considered (section 10), where every model and dataset came from (section 11), and what the literature predicted vs what my experiments showed (section 12). The points that shaped the design:
 
 - **Sentinel-2 RGB is 10 m**; ×4 SR to 2.5 m is the community standard (OpenSR, Satlas, WorldStrat benchmarks).
 - **Single-image vs multi-image SR:** multi-image SR uses several revisits but needs careful co-registration and cloud masking; single-image SR is simpler and directly comparable with the pretrained models I wanted to test. I chose single-image ×4.
