@@ -19,3 +19,4 @@ results/ports/*/*/
 presentation/_assets/
 results/*.log
 PROJECT_NOTES.txt
+temp/
