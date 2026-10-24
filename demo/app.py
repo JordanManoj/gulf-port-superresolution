@@ -69,7 +69,7 @@ with tab2:
               "failures_satlas.png", "ablation_init.png"]:
         p = os.path.join(ROOT, "results", "figures", f)
         if os.path.exists(p):
-            st.image(p, use_container_width=True)
+            st.image(p, width="stretch")
 
 with tab3:
     up = st.file_uploader("Sentinel-2 true-colour PNG/JPG at 10 m (small crops, < 400×400 px)", type=["png", "jpg", "jpeg"])
