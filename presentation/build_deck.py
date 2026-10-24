@@ -393,9 +393,9 @@ set_paras(shape(s5, "U"), ["Usefulness",
                            f"Detector agreement with SPOT is inconclusive: {n_ref_test} reference objects in 120 test tiles, and all "
                            f"F1 intervals overlap (bicubic {ci.loc[(T, 'bicubic'), 'det_f1']:.2f}, GAN {ci.loc[(T, 'ft_gan'), 'det_f1']:.2f})."])
 set_paras(shape(s5, "H"), ["Hallucination",
-                           f"Satlas introduces structure in {100 * s(G, 'satlas', 'hallucination'):.0f} % of Gulf patches. Fine-tuning "
-                           f"reduces Real-ESRGAN's {100 * s(T, 'realesrgan', 'hallucination'):.0f} % to {100 * s(T, 'ft_gan', 'hallucination'):.0f} % "
-                           f"(GAN) and {100 * s(T, 'ft_l1', 'hallucination'):.0f} % (L1) on the global test set."])
+                           f"Gulf patches flagged: Satlas {100 * s(G, 'satlas', 'hallucination'):.0f} %, GAN {100 * s(G, 'ft_gan', 'hallucination'):.0f} %, "
+                           f"Real-ESRGAN {100 * s(G, 'realesrgan', 'hallucination'):.0f} %, L1 {100 * s(G, 'ft_l1', 'hallucination'):.0f} %. "
+                           f"Only the L1 model is close to bicubic."])
 set_paras(shape(s5, "Footnote"), ["13 held-out Gulf tiles (never used in training) / 120 global WorldStrat test tiles. SSIM, LPIPS and "
                                   "hallucination on Gulf tiles. SR colours harmonised to the input before scoring; confidence intervals "
                                   "from 10,000 paired bootstrap resamples. Source: results/metrics/per_tile_summary.csv, bootstrap_ci.csv."])
@@ -532,7 +532,7 @@ set_paras(shape(end_slide, "Title 1"), ["Conclusions"])
 sub = shape(end_slide, "Subtitle 2")
 sub.top, sub.height = Inches(4.3), Inches(1.7)
 set_paras(sub, ["1   The training domain matters more than the architecture: US-only pretraining fails in the Gulf",
-                f"2   Fidelity-oriented SR is reliable but gains only {c_l1.d_psnr:.2f} dB; GAN SR aids vessel detection",
+                f"2   Fidelity-oriented SR is reliable but gains only {c_l1.d_psnr:.2f} dB; GAN SR surfaces more vessels at ports",
                 "3   SR should be used as a visual aid, with every output accompanied by a hallucination check"])
 for p in sub.text_frame.paragraphs:
     for r in p.runs:

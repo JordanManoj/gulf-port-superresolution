@@ -18,3 +18,4 @@ results/ports/*/*/
 *.pt
 presentation/_assets/
 results/*.log
+PROJECT_NOTES.txt
