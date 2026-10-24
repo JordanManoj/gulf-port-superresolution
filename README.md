@@ -21,7 +21,7 @@ Can deep-learning super-resolution turn free 10 m Sentinel-2 imagery into 2.5 m 
 10. [Setup and how to run](#10-setup-and-how-to-run)
 11. [Repository layout](#11-repository-layout)
 
-Further reading: [`DECISIONS.md`](DECISIONS.md) (dated log of every decision and obstacle), [`docs/RESEARCH.md`](docs/RESEARCH.md) (literature with sources), [`docs/TECHNICAL_EXPLAINER.md`](docs/TECHNICAL_EXPLAINER.md) (every component, plain then technical), [`docs/QA_PREP.md`](docs/QA_PREP.md) (likely questions and answers), [`data/README.md`](data/README.md) (data sources, licences, how to re-create).
+Further reading: [`docs/PROJECT_WALKTHROUGH.md`](docs/PROJECT_WALKTHROUGH.md) (the whole project as a story: what I tried, what changed and why), [`DECISIONS.md`](DECISIONS.md) (dated log of every decision and obstacle), [`docs/RESEARCH.md`](docs/RESEARCH.md) (literature with sources), [`docs/TECHNICAL_EXPLAINER.md`](docs/TECHNICAL_EXPLAINER.md) (every component, plain then technical), [`docs/QA_PREP.md`](docs/QA_PREP.md) (likely questions and answers), [`data/README.md`](data/README.md) (data sources, licences, how to re-create).
 
 ---
 
@@ -227,7 +227,8 @@ Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN
 ├── configs/                   training configs (ablation, ft_l1, ft_gan)
 ├── data/README.md             data sources, licences, re-creation (data itself not committed)
 ├── demo/app.py                Streamlit demo
-├── docs/
+├── docs/                      every document also as .docx (python scripts/md_to_docx.py)
+│   ├── PROJECT_WALKTHROUGH.md what I built, tried, changed and why
 │   ├── RESEARCH.md            literature review with sources
 │   ├── TECHNICAL_EXPLAINER.md every component explained
 │   ├── QA_PREP.md             likely questions and answers
@@ -236,6 +237,7 @@ Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN
 │   ├── build_deck.py          builds the deck from the template + results
 │   ├── template_original.pptx
 │   └── Super-Resolution_for_Port_Intelligence.pptx
+├── scripts/md_to_docx.py      Markdown -> Word for the docs
 ├── results/
 │   ├── figures/               all figures used in README and slides
 │   ├── metrics/               per-tile metrics, summaries, bootstrap CIs, port metrics
