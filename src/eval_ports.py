@@ -43,7 +43,7 @@ def main():
                 if m == "bicubic":
                     sr = bicubic(lr)
                 elif m in models:
-                    sr = sr_tiled(models[m], lr, tile=32 if m == "satlas" else 64, pad=4 if m == "satlas" else 8)
+                    sr = sr_tiled(models[m], lr, tile=32 if m == "satlas" else 64, pad=4 if m == "satlas" else 24)
                 else:
                     continue
                 srs[(date, m)] = sr

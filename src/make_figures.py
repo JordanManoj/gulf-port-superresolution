@@ -108,7 +108,8 @@ def ablation_curves():
         plt.close(fig)
 
 
-def comparison_grid(per_tile, tiles, fname, title, crop=192):
+def comparison_grid(per_tile, tiles, fname, title, crop=192, fs=1.0):
+    """fs scales all fonts (fs > 1 for slide versions); title=None omits the figure title."""
     methods = [m for m in LABEL if m in per_tile.method.unique()]
     cols = ["lr"] + methods + ["hr"]
     fig, axs = plt.subplots(len(tiles), len(cols), figsize=(2.1 * len(cols), 2.2 * len(tiles)))
@@ -129,12 +130,13 @@ def comparison_grid(per_tile, tiles, fname, title, crop=192):
             axs[i, j].imshow(im[y0:y0 + crop, x0:x0 + crop])
             axs[i, j].set_xticks([]); axs[i, j].set_yticks([])
             if i == 0:
-                axs[i, j].set_title({"lr": "Sentinel-2\n10 m (input)", "hr": "SPOT reference\n2.5 m"}.get(c, LABEL.get(c, c)), fontsize=8)
+                axs[i, j].set_title({"lr": "Sentinel-2\n10 m (input)", "hr": "SPOT reference\n2.5 m"}.get(c, LABEL.get(c, c)), fontsize=8 * fs)
             if c in methods:
                 r = per_tile[(per_tile.tile == t) & (per_tile.method == c)].iloc[0]
-                axs[i, j].set_xlabel(f"{r.psnr:.1f} dB | hal {r.hallucination:.0%}", fontsize=7)
-        axs[i, 0].set_ylabel(t[:22], fontsize=7)
-    fig.suptitle(title, fontsize=11)
+                axs[i, j].set_xlabel(f"{r.psnr:.1f} dB | hal {r.hallucination:.0%}", fontsize=7 * fs)
+        axs[i, 0].set_ylabel(t[:22], fontsize=7 * fs)
+    if title:
+        fig.suptitle(title, fontsize=11)
     fig.tight_layout()
     fig.savefig(os.path.join(FIG, fname), bbox_inches="tight")
     plt.close(fig)
@@ -167,7 +169,7 @@ def hallucination_figure(per_tile, s, t, method, fname):
     plt.close(fig)
 
 
-def port_figures():
+def port_figures(slide=False):
     ports = os.path.join(ROOT, "results", "ports")
     if not os.path.isdir(ports):
         return
@@ -178,22 +180,80 @@ def port_figures():
         methods = [m for m in LABEL if os.path.exists(os.path.join(ports, port, date, f"{m}.png"))]
         ims = {m: rgb(os.path.join(ports, port, date, f"{m}.png")) for m in methods}
         h, w = ims["bicubic"].shape[:2]
-        cy, cx, c = h // 2, w // 2, 320
+        c = 320
+        # crop where the bicubic image has the most structure (quays, yards), not open water
+        g = cv2.cvtColor(ims["bicubic"], cv2.COLOR_RGB2GRAY).astype(np.float32)
+        e = cv2.blur(np.abs(cv2.Laplacian(g, cv2.CV_32F)), (2 * c, 2 * c))
+        e[:c], e[-c:], e[:, :c], e[:, -c:] = 0, 0, 0, 0
+        cy, cx = np.unravel_index(np.argmax(e), e.shape)
         fig, axs = plt.subplots(1, len(methods), figsize=(3.3 * len(methods), 3.6))
         for ax, m in zip(axs, methods):
-            ax.imshow(ims[m][cy - c:cy + c, cx - c:cx + c])
+            ax.imshow(display(ims[m][cy - c:cy + c, cx - c:cx + c]))
             dd = det[f"{port}/{date}/{m}"]
             for poly, cl in zip(dd["boxes"], dd["classes"]):
                 p = np.array(poly) - [cx - c, cy - c]
                 if (p.min() >= 0) and (p.max() < 2 * c):
                     ax.add_patch(plt.Polygon(p, fill=False, ec="cyan" if cl == "ship" else "yellow", lw=0.8))
             n = len(dd["classes"])
-            ax.set_title(f"{LABEL[m].replace(chr(10), ' ')}\n{dd['classes'].count('ship')} ships, {n} detections (full AOI)", fontsize=8)
+            ships = dd["classes"].count("ship")
+            ax.set_title(LABEL[m].replace(chr(10), " ") + f"\n{ships} ships, {n} detections", fontsize=11 if slide else 8)
             ax.set_xticks([]); ax.set_yticks([])
-        fig.suptitle(f"{port.replace('_', ' ').title()}, Sentinel-2 {date}, x4 (cyan = ship detections)", fontsize=10)
+        if not slide:
+            fig.suptitle(f"{port.replace('_', ' ').title()}, Sentinel-2 {date}, x4 (cyan = ship, yellow = other DOTA class; display gamma 0.6)",
+                         fontsize=10, y=1.03)
         fig.tight_layout()
-        fig.savefig(os.path.join(FIG, f"port_{port}.png"), bbox_inches="tight")
+        fig.savefig(os.path.join(FIG, f"port_{port}{'_slide' if slide else ''}.png"), bbox_inches="tight")
         plt.close(fig)
+
+
+def display(im, gamma=0.6):
+    """Display-only brightening (same for every panel) so dark water/ships are visible. Not used in any metric."""
+    return (255 * (im / 255.0) ** gamma).astype(np.uint8)
+
+
+def gan_only_ships(n=4, fname="port_gan_only_ships.png", width=10):
+    """Ships the detector finds after GAN SR but not on bicubic: real vessels made visible, or hallucinated ones?"""
+    ports = os.path.join(ROOT, "results", "ports")
+    det = json.load(open(os.path.join(MET, "ports_detections.json")))
+    cands = []
+    for key, dd in det.items():
+        port, date, m = key.split("/")
+        if m != "ft_gan":
+            continue
+        base = det[f"{port}/{date}/bicubic"]
+        bc = [np.array(p).mean(0) for p, cl in zip(base["boxes"], base["classes"]) if cl == "ship"]
+        for poly, cl, cf in zip(dd["boxes"], dd["classes"], dd["conf"]):
+            if cl != "ship":
+                continue
+            ctr = np.array(poly).mean(0)
+            if all(np.linalg.norm(ctr - b) > 20 for b in bc):
+                cands.append((cf, port, date, ctr))
+    cands = sorted(cands, key=lambda x: -x[0])[:n]
+    if not cands:
+        return
+    cols = ["lr", "bicubic", "ft_l1", "ft_gan"]
+    fig, axs = plt.subplots(len(cands), 4, figsize=(width, 2.6 * len(cands) * width / 10))
+    axs = np.atleast_2d(axs)
+    for i, (cf, port, date, (x, y)) in enumerate(cands):
+        r = 48
+        for j, c in enumerate(cols):
+            if c == "lr":
+                lr = rgb(os.path.join(ROOT, "data", "s2_ports", port, f"{date}_rgb.png"))
+                im = cv2.resize(lr, (lr.shape[1] * 4, lr.shape[0] * 4), interpolation=cv2.INTER_NEAREST)
+            else:
+                im = rgb(os.path.join(ports, port, date, f"{c}.png"))
+            y0, x0 = int(np.clip(y - r, 0, im.shape[0] - 2 * r)), int(np.clip(x - r, 0, im.shape[1] - 2 * r))
+            axs[i, j].imshow(display(im[y0:y0 + 2 * r, x0:x0 + 2 * r]), interpolation="nearest")
+            axs[i, j].set_xticks([]); axs[i, j].set_yticks([])
+            if i == 0:
+                axs[i, j].set_title({"lr": "Sentinel-2 10 m (pixels)", "bicubic": "Bicubic", "ft_l1": "Fine-tuned L1",
+                                     "ft_gan": "Fine-tuned GAN"}[c], fontsize=9)
+        axs[i, 0].set_ylabel(port.split("_")[0] + f" {date}\nconf {cf:.2f}", fontsize=8)
+    if n > 2:
+        fig.suptitle("'Ships' detected only after GAN super-resolution: check the 10 m input before trusting them", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(os.path.join(FIG, fname), bbox_inches="tight")
+    plt.close(fig)
 
 
 def main():
@@ -208,6 +268,7 @@ def main():
     comparison_grid(per_tile, list(gain.index[:3]), "examples_success.png", "Where SR helps most (largest PSNR gain of fine-tuned L1 over bicubic)")
     gulf = [i for i in piv.index if i[0] == "gulf_test"][:4]
     comparison_grid(per_tile, gulf, "examples_gulf.png", "Held-out Gulf tiles")
+    comparison_grid(per_tile, [gulf[i] for i in (0, 1, 2)], "examples_gulf_slide.png", None, fs=1.45)
     hal = per_tile.pivot_table(index=["set", "tile"], columns="method", values="hallucination")
     for m in ["ft_gan", "satlas", "realesrgan"]:
         if m in hal:
@@ -220,6 +281,9 @@ def main():
         hallucination_figure(per_tile, s, t, "ft_gan", "hallucination_map_gulf_ft_gan.png")
         hallucination_figure(per_tile, s, t, "ft_l1", "hallucination_map_gulf_ft_l1.png")
     port_figures()
+    port_figures(slide=True)
+    gan_only_ships()
+    gan_only_ships(n=2, fname="port_gan_only_ships_2.png", width=8)
     print("figures ->", FIG)
 
 

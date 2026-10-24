@@ -97,7 +97,7 @@ def main():
                 sr_raw = base
             elif m in models:
                 sr_raw = sr_tiled(models[m], lr, tile=SAT_TILE if m == "satlas" else 64,
-                                  pad=4 if m == "satlas" else 8)
+                                  pad=4 if m == "satlas" else 24)
             else:
                 continue
             sr = hist_match(sr_raw, base, valid) if m != "bicubic" else base

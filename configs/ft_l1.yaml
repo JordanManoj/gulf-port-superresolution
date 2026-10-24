@@ -1,0 +1,12 @@
+# L1 fine-tune from the best ablation init (realesrgan), longer budget, all 60 val tiles for selection.
+name: ft_l1
+init: realesrgan
+mode: l1
+iters: 4000
+batch: 8
+lr_patch: 32
+lr_g: 0.0001
+val_every: 500
+n_val: 60
+seed: 0
+save_to: weights/finetuned_l1.pth

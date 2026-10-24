@@ -16,3 +16,5 @@ results/sr_outputs/
 results/ports/*/*/
 *.pth
 *.pt
+presentation/_assets/
+results/*.log

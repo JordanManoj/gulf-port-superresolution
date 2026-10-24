@@ -1,0 +1,8 @@
+{
+ "scores": {
+  "realesrgan": 28.791184960677242,
+  "satlas": 24.218726298494605,
+  "scratch": 23.725294722848016
+ },
+ "best_init": "realesrgan"
+}

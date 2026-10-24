@@ -92,7 +92,7 @@ def load_model(name, device="cuda"):
 
 
 @torch.no_grad()
-def sr_tiled(model, img_u8, tile=64, pad=8, device="cuda", half=True):
+def sr_tiled(model, img_u8, tile=64, pad=24, device="cuda", half=True):
     """Super-resolve an HxWx3 uint8 image with overlapping tiles (keeps 4 GB GPUs happy)."""
     h, w, _ = img_u8.shape
     x = torch.from_numpy(img_u8).permute(2, 0, 1).float().div(255)[None].to(device)
