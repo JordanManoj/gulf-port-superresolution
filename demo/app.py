@@ -52,8 +52,15 @@ with tab1:
                 for poly, cl in zip(det[f"{port}/{date}/{m}"]["boxes"], det[f"{port}/{date}/{m}"]["classes"]):
                     cv2.polylines(im, [np.array(poly, np.int32)], True, (0, 255, 255) if cl == "ship" else (255, 255, 0), 2)
                 ims[m] = im
-        from streamlit_image_comparison import image_comparison
-        image_comparison(img1=ims[left], img2=ims[right], label1=LABEL[left], label2=LABEL[right], width=1100)
+        try:
+            from streamlit_image_comparison import image_comparison
+            image_comparison(img1=ims[left], img2=ims[right], label1=LABEL[left], label2=LABEL[right], width=1100)
+        except ImportError:  # started outside the project venv: show side by side instead of a slider
+            st.info("Slider unavailable in this Python environment. Start the demo with run_demo.ps1 "
+                    "(or .venv\\Scripts\\python -m streamlit run demo/app.py).")
+            ca, cb = st.columns(2)
+            ca.image(ims[left], caption=LABEL[left])
+            cb.image(ims[right], caption=LABEL[right])
         p = os.path.join(MET, "ports_per_image.csv")
         if os.path.exists(p):
             df = pd.read_csv(p)
@@ -69,7 +76,7 @@ with tab2:
               "failures_satlas.png", "ablation_init.png"]:
         p = os.path.join(ROOT, "results", "figures", f)
         if os.path.exists(p):
-            st.image(p, width="stretch")
+            st.image(p)
 
 with tab3:
     up = st.file_uploader("Sentinel-2 true-colour PNG/JPG at 10 m (small crops, < 400×400 px)", type=["png", "jpg", "jpeg"])

@@ -223,6 +223,7 @@ Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN
 ├── requirements.txt           pinned dependencies
 ├── run_pipeline.ps1           full offline pipeline in a visible window
 ├── run_eval.ps1               evaluation-only re-run
+├── run_demo.ps1               starts the demo with the project .venv
 ├── aoi/                       GeoJSON areas of interest (3 UAE ports)
 ├── configs/                   training configs (ablation, ft_l1, ft_gan)
 ├── data/README.md             data sources, licences, re-creation (data itself not committed)
