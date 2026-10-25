@@ -207,7 +207,7 @@ python src/run_all.py          # or: powershell -File run_pipeline.ps1 (visible 
 powershell -File run_eval.ps1
 
 # 3. Demo (before/after slider over the ports, WorldStrat results, upload your own image)
-streamlit run demo/app.py
+powershell -File run_demo.ps1      # starts the demo with the project .venv
 
 # 4. Slides (numbers read from results/metrics/*.csv)
 python presentation/build_deck.py

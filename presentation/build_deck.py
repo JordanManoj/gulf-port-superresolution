@@ -537,7 +537,7 @@ set_paras(sub, ["1   The training domain matters more than the architecture: US-
 for p in sub.text_frame.paragraphs:
     for r in p.runs:
         r.font.size = Pt(18)
-set_paras(shape(end_slide, "Presenter"), ["Demonstration: streamlit run demo/app.py  |  Code, data scripts and results in the project repository  |  Questions"])
+set_paras(shape(end_slide, "Presenter"), ["Demonstration: Streamlit app (run_demo.ps1)  |  Code, data scripts and results in the project repository  |  Questions"])
 shape(end_slide, "Presenter").top = Inches(6.35)
 notes(end_slide, "Conclude with the three findings, then switch to the live demonstration (before/after slider over Khalifa Port, "
                  "Jebel Ali and Zayed Port) and take questions.")
