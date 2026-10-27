@@ -197,6 +197,24 @@ def duplicate_slide(prs, index):
     return dst
 
 
+def copy_shape(src, name, dst, new_name, box):
+    """Copy a text shape from another slide (keeps its styling), rename it and place it at box=(x,y,w,h) inches."""
+    el = copy.deepcopy(shape(src, name)._element)
+    nv = el.find(".//" + qn("p:cNvPr"))
+    nv.set("name", new_name)
+    nv.set("id", str(max(int(e.get("id")) for e in dst.shapes._spTree.iter(qn("p:cNvPr"))) + 1))
+    dst.shapes._spTree.append(el)
+    sh = shape(dst, new_name)
+    sh.left, sh.top, sh.width, sh.height = [Inches(v) for v in box]
+    return sh
+
+
+def font_size(sh, pt):
+    for p in sh.text_frame.paragraphs:
+        for r in p.runs:
+            r.font.size = Pt(pt)
+
+
 def move_slide(prs, old, new):
     ids = prs.slides._sldIdLst
     el = list(ids)[old]
@@ -216,13 +234,13 @@ def style_chart(chart, size=11):
 
 # ------------------------------------------------------------------ build
 prs = Presentation(os.path.join(PRES, "template_original.pptx"))
-# structure first: 8 template slides -> 14. New slides are copies of template slides, so the design stays identical.
-data_slide = duplicate_slide(prs, 5)      # 4 image frames -> data sources
-abl_slide = duplicate_slide(prs, 1)       # two columns    -> initialisation ablation
-gallery_slide = duplicate_slide(prs, 5)   # title only     -> all methods on Gulf tiles
-portview_slide = duplicate_slide(prs, 5)  # title only     -> port views with detections
-port_slide = duplicate_slide(prs, 1)      # two columns    -> vessels found after SR
-end_slide = duplicate_slide(prs, 0)       # dark           -> conclusions
+# structure first: 8 template slides + 5 copies. The brief asks for 6-8 slides, so 8 slides carry the talk and
+# 5 hidden backup slides keep the detail for questions. Copies of template slides keep the design identical.
+data_slide = duplicate_slide(prs, 5)      # backup: data alignment
+abl_slide = duplicate_slide(prs, 1)       # backup: initialisation ablation chart
+gallery_slide = duplicate_slide(prs, 5)   # main:   all methods on Gulf tiles + hallucination
+portview_slide = duplicate_slide(prs, 5)  # backup: port views with detections
+port_slide = duplicate_slide(prs, 1)      # main:   ports, views and vessels found after SR
 s1, s2, s3, s4, s5, s6, s7, s8 = [prs.slides[i] for i in range(8)]
 c_l1 = ci.loc[(G, "ft_l1")]
 d_scr = abl_best["realesrgan"] - abl_best["scratch"]
@@ -281,8 +299,9 @@ notes(data_slide, "Two data sources. WorldStrat (NeurIPS 2022) pairs real Sentin
 # ---------------- 4. pipeline
 set_paras(shape(s3, "Title 1"), ["Five upscaling methods pass through one evaluation pipeline"])
 for name, title, body in [
-        ("D1", "WorldStrat v1.1", "Sentinel-2 and SPOT 1.5 m pairs; 600 train, 60 val, 120 test, 13 Gulf tiles held out"),
-        ("D2", "Sentinel-2 L2A", "Khalifa, Jebel Ali and Zayed Port; four cloud-free dates each"),
+        ("D1", "WorldStrat v1.1", "Sentinel-2 and SPOT 1.5 m pairs, colour-matched and sub-pixel registered; 600 train, "
+                                  "60 val, 120 test, 13 Gulf tiles held out"),
+        ("D2", "Sentinel-2 L2A", "Khalifa, Jebel Ali and Zayed Port; four cloud-free dates each; no 2.5 m reference"),
         ("M0", "Bicubic", "Interpolation baseline"),
         ("M1", "Pre-trained", "Real-ESRGAN (photographs) and Satlas (Sentinel-2 to US aerial)"),
         ("M2", "Fine-tuned on WorldStrat", "L1 loss (fidelity) and L1 + VGG + GAN (realism)"),
@@ -295,10 +314,15 @@ for name, title, body in [
     set_paras(shape(s3, name), [title, body])
 notes(s3, "Every method passes through the same pipeline. Data: WorldStrat for training and reference-based evaluation; "
           "Sentinel-2 L2A over the three ports from Element 84 Earth Search (AWS open data, no account required, reflectance "
-          "offset of -0.1 handled).\n\nEvaluation on three axes: image quality, usefulness for a frozen detector, and hallucination.")
+          "offset of -0.1 handled).\n\nWorldStrat (NeurIPS 2022) pairs real Sentinel-2 revisits with real 1.5 m SPOT imagery "
+          "worldwide, including the Gulf. The full dataset is 104 GB; I read the zip index with HTTP range requests and "
+          "downloaded approximately 2.5 GB. SPOT colours differ strongly from Sentinel-2, so the reference is resampled to "
+          "2.5 m, histogram-matched and registered to sub-pixel accuracy by phase correlation; otherwise PSNR would mostly "
+          "measure the sensor difference, and a one-pixel offset at 2.5 m costs several dB. (Backup slide: the alignment "
+          "steps on one tile.)\n\nEvaluation on three axes: image quality, usefulness for a frozen detector, and hallucination.")
 
 # ---------------- 5. build vs reuse
-set_paras(shape(s4, "Title 1"), ["Reuse pre-trained weights, then fine-tune on real satellite pairs"])
+set_paras(shape(s4, "Title 1"), [f"Pre-trained weights beat training from scratch by {d_scr:.0f} dB"])
 tb = shape(s4, "Build vs Reuse Table")
 resize_rows(tb.table, 6, [1, 2, 2, 3, 3])
 rows = [("Bicubic", "Standard library", "Sets the floor that every learned model must exceed"),
@@ -313,10 +337,10 @@ for i, row in enumerate(tb.table.rows):
     row.height = Inches(0.45 if i == 0 else 0.42)
 for nm in ["Scratch", "Scratch Accent", "Fallback", "Fallback Accent"]:
     shape(s4, nm).top = Inches(4.95)
-set_paras(shape(s4, "Scratch"), ["WHY NOT TRAIN FROM SCRATCH",
-                                 f"Measured rather than assumed: with identical data, loss and 1,500 iterations, a random initialisation "
-                                 f"reaches {abl_best['scratch']:.1f} dB validation PSNR, against {abl_best['realesrgan']:.1f} dB from "
-                                 f"Real-ESRGAN weights."])
+set_paras(shape(s4, "Scratch"), ["WHY NOT TRAIN FROM SCRATCH: MEASURED",
+                                 f"Same data, loss and 1,500 iterations; only the starting weights differ. Validation PSNR: "
+                                 f"Real-ESRGAN {abl_best['realesrgan']:.1f} dB, Satlas {abl_best['satlas']:.1f} dB, random "
+                                 f"{abl_best['scratch']:.1f} dB. US satellite weights lose to generic photo weights."])
 set_paras(shape(s4, "Fallback"), ["WHY NOT DIFFUSION OR MULTI-IMAGE SR",
                                   "Diffusion models exceed the 4 GB GPU budget and hallucinate more in published benchmarks. Multi-image "
                                   "SR fails on vessels that move between passes; it is the next step for static infrastructure."])
@@ -325,7 +349,12 @@ notes(s4, "Both pre-trained models share exactly the same RRDBNet architecture (
           "because the BasicSR package is incompatible with current torchvision, and verified that it loads both official "
           "checkpoints with strict key matching.\n\nTraining: 4,000 L1 iterations from Real-ESRGAN weights (selected by the "
           "ablation on the next slide), then 3,000 GAN iterations. Adam optimiser, cosine learning-rate decay, exponential moving "
-          "average of weights, full precision because half precision produced NaN losses on the GTX 1650.")
+          "average of weights, full precision because half precision produced NaN losses on the GTX 1650.\n\n"
+          "The initialisation ablation answers the question from the first interview on pre-trained models: identical data "
+          f"(1,607 pairs), loss and iterations; only the initial weights differ. Real-ESRGAN ends at {abl_best['realesrgan']:.2f} dB, "
+          f"Satlas at {abl_best['satlas']:.2f} dB, random at {abl_best['scratch']:.2f} dB. The satellite-specific Satlas weights do "
+          "worse than generic photographic weights because Satlas learned US imagery with NAIP colours and must first unlearn "
+          "that prior on Gulf scenes. (Backup slide: the training curves.)")
 
 # ---------------- 6. initialisation ablation
 set_paras(shape(abl_slide, "Title 1"), [f"Pre-trained weights outperform training from scratch by {d_scr:.0f} dB on the same budget"])
@@ -408,21 +437,44 @@ notes(s5, "These results describe a trade-off rather than a single ranking.\n\n"
           "a patch is counted as hallucinated when the output moves away from both the input and the reference.\n\n"
           "Usefulness: the downstream detection test is underpowered, because WorldStrat tiles contain few detectable objects.")
 
-# ---------------- 8. gallery: all methods on held-out Gulf tiles (new, image)
-set_paras(shape(gallery_slide, "Title 1"), ["All five methods on held-out Gulf tiles, against the SPOT reference"])
+# ---------------- 8. gallery + hallucination (main): all methods on held-out Gulf tiles, how patches are flagged
+set_paras(shape(gallery_slide, "Title 1"), ["Hallucination: detail that moves away from both the input and the reference"])
 for i in range(4):
     remove(gallery_slide, f"Caption {i}", f"Image Frame {i}")
 gal = rgb(os.path.join(FIG, "examples_gulf_slide.png"))  # slide version: 3 tiles, larger labels
-put_image(gallery_slide, None, gal, "gallery_gulf.png", box=(0.5, 1.5, 12.33, 4.75), fit=True)
-set_paras(shape(gallery_slide, "Note"), ["Three of the 13 held-out Gulf tiles. Under each panel: PSNR against the reference and the share "
-                                         "of hallucinated patches. Satlas renders vegetation typical of its US training data; the GAN "
-                                         "model reconstructs the street layout most convincingly."])
-shape(gallery_slide, "Note").top = Inches(6.35)
-notes(gallery_slide, "This gallery shows every method on held-out Gulf tiles. Three observations.\n\nFirst, Satlas consistently "
-                     "replaces Gulf scenes with vegetation and terrain typical of its US training data; this is the domain-shift failure.\n\n"
-                     "Second, the L1 model is faithful but remains soft; visually it is close to bicubic.\n\nThird, the GAN model "
-                     "reconstructs street grids and building outlines that resemble the reference, yet its PSNR is lower, because the "
-                     "individual structures are placed slightly incorrectly. Source: results/figures/examples_gulf.png.")
+put_image(gallery_slide, None, gal, "gallery_gulf.png", box=(0.5, 1.55, 8.4, 4.5), fit=True)
+set_paras(shape(gallery_slide, "Note"), ["Three of the 13 held-out Gulf tiles, never used in training. Under each panel: PSNR against "
+                                         "the SPOT reference and the share of hallucinated patches."])
+nt = shape(gallery_slide, "Note")
+nt.left, nt.top, nt.width = Inches(0.5), Inches(6.1), Inches(8.4)
+lab = copy_shape(s7, "Lesson Label", gallery_slide, "Method Label", (9.25, 1.55, 3.58, 0.33))
+set_paras(lab, ["HOW A PATCH IS FLAGGED"])
+body = copy_shape(s7, "Lessons", gallery_slide, "Method Body", (9.25, 1.9, 3.58, 2.1))
+set_paras(body, [[("Align: ", True), ("colour-match and sub-pixel register SPOT", False)],
+                 [("Compare: ", True), ("per 8×8 patch, SR distance to the reference and to bicubic", False)],
+                 [("Flag: ", True), ("SR moved away from both input and reference", False)]])
+font_size(body, 13)
+lab = copy_shape(s7, "Lesson Label", gallery_slide, "Fail Label", (9.25, 4.1, 3.58, 0.33))
+set_paras(lab, ["WHAT THE FAILURE CASES SHOW"])
+body = copy_shape(s7, "Lessons", gallery_slide, "Fail Body", (9.25, 4.45, 3.58, 2.3))
+set_paras(body, [[("Domain shift: ", True), (f"Satlas paints US-style vegetation ({100 * s(G, 'satlas', 'hallucination'):.0f} % of Gulf patches)", False)],
+                 [("GAN texture ", True), ("is realistic but not accurate: roofs and walls slightly misplaced", False)],
+                 [("L1 ", True), ("is faithful but soft, close to bicubic", False)],
+                 [("Some flags are real change ", True), ("between dates, e.g. a replanted field", False)]])
+font_size(body, 13)
+notes(gallery_slide, "This slide combines what the models draw with how I check it.\n\nMethod: after colour matching and "
+                     "registration, for each 8x8 patch I compute d_im = |SR - HR| / |bicubic - HR| and d_om = |SR - bicubic| / "
+                     "|bicubic - HR|. If the output is closer to the reference than bicubic, the patch is an improvement. If it has "
+                     "moved away from both the input and the reference, it is a hallucination. This is a simplified version of the "
+                     "correctness metric in ESA's OpenSR-test benchmark.\n\nThe gallery: first, Satlas consistently replaces Gulf "
+                     "scenes with vegetation and terrain typical of its US training data; this is the domain-shift failure. Second, "
+                     "the L1 model is faithful but remains soft; visually it is close to bicubic. Third, the GAN model reconstructs "
+                     "street grids and building outlines that resemble the reference (bottom row: Sharjah), yet its PSNR is lower, "
+                     "because individual roofs and walls are placed slightly incorrectly: the perception-distortion trade-off in one "
+                     "example, and the reason an analyst should not count buildings or vehicles on GAN output.\n\nLimitation: SPOT "
+                     "and Sentinel-2 are not acquired on the same day, so some flagged patches are genuine change, such as a "
+                     "replanted field. (Backup slides: the Sharjah close-up and the patch-level hallucination map.) "
+                     "Source: results/figures/examples_gulf.png.")
 
 # ---------------- 9. same tile under each method
 tile = "Landcover-773487"  # held-out Gulf tile, Sharjah (25.35 N, 55.47 E)
@@ -489,9 +541,12 @@ notes(portview_slide, "Two of the three ports, each shown with all five methods 
 # ---------------- 12. ports: vessels found after SR
 P = ports
 set_paras(shape(port_slide, "Title 1"), ["GAN super-resolution makes berthed vessels detectable, but its deck detail is not evidence"])
-set_paras(shape(port_slide, "Question Label"), ["VESSELS DETECTED ONLY AFTER GAN SR ARE VISIBLE IN THE 10 M INPUT"])
+set_paras(shape(port_slide, "Question Label"), ["JEBEL ALI, ALL FIVE METHODS WITH DETECTOR OUTPUT"])
 remove(port_slide, "Question Body", "Image Frame Port")
-put_image(port_slide, None, rgb(os.path.join(FIG, "port_gan_only_ships_2.png")), "port_ships.png", box=(0.5, 2.36, 6.53, 4.4), fit=True)
+put_image(port_slide, None, rgb(os.path.join(FIG, "port_jebel_ali_port_slide.png")), "port_strip.png", box=(0.5, 2.3, 6.53, 1.5), fit=True)
+lab = copy_shape(port_slide, "Question Label", port_slide, "Ships Label", (0.5, 3.95, 6.53, 0.33))
+set_paras(lab, ["VESSELS FOUND ONLY AFTER GAN SR ARE VISIBLE IN THE 10 M INPUT"])
+put_image(port_slide, None, rgb(os.path.join(FIG, "port_gan_only_ships_2.png")), "port_ships.png", box=(0.5, 4.33, 6.53, 2.4), fit=True)
 set_paras(shape(port_slide, "Relevance Label"), ["REFERENCE-FREE CHECKS: 3 PORTS × 4 DATES"])
 set_paras(shape(port_slide, "Relevance Body"), [
     [("Vessels per image: ", True), (f"bicubic {P.loc['bicubic', 'n_ship']:.1f}, GAN {P.loc['ft_gan', 'n_ship']:.1f}, "
@@ -500,7 +555,10 @@ set_paras(shape(port_slide, "Relevance Body"), [
     [("Satlas suppresses port structure: ", True), (f"{P.loc['satlas', 'n_det']:.1f} detections per image, against {P.loc['bicubic', 'n_det']:.0f} for bicubic", False)],
     [("GAN detail varies between dates: ", True), (f"+{P.loc['ft_gan', 'excess_instability']:.1f} grey levels on pixels the input shows as unchanged", False)],
     [("Implication: ", True), ("detections may be used; synthesised texture may not", False)]])
-notes(port_slide, "As no 2.5 m reference exists for these dates, the ports are evaluated with reference-free checks.\n\n"
+notes(port_slide, "Top left: Jebel Ali with all five methods and the frozen YOLO11-OBB (DOTA) detector; cyan boxes are ships, "
+                  "yellow boxes other classes such as storage tanks. The tank farm is detected consistently by every method "
+                  "except Satlas, which converts the port into US-style terrain. (Backup slide: Khalifa Port as well.)\n\n"
+                  "As no 2.5 m reference exists for these dates, the ports are evaluated with reference-free checks.\n\n"
                   "1) Detections: the frozen DOTA detector finds more vessels after GAN super-resolution. I inspected every vessel "
                   "that appears only after GAN SR: all are genuine berthed vessels, visible in the 10 m pixels. Super-resolution "
                   "therefore assists the detector. However, the containers and superstructure drawn on deck cannot be verified from "
@@ -513,38 +571,43 @@ set_paras(shape(s8, "Lim Body"), [
     [("SPOT and Sentinel-2 are ", False), ("not acquired simultaneously", True), (", so some flags are real change", False)],
     [("The detection test is ", False), (f"underpowered ({n_ref_test} objects)", True), ("; labels are pseudo ground truth", False)],
     [("A linear 8-bit stretch ", False), ("darkens water", True), ("; WorldStrat SPOT data is CC BY-NC", False)]])
-for nm, y in [("Next Label", 4.15), ("Next Body", 4.51)]:
+for nm, y in [("Next Label", 4.12), ("Next Body", 4.48)]:
     shape(s8, nm).top = Inches(y)
 set_paras(shape(s8, "Next Body"), [
-    [("Multi-image SR", True), (" from repeated passes for static port infrastructure", False)],
-    [("SEN2SR", True), (" (radiometrically consistent, ESA OpenSR) as a further baseline", False)],
-    [("A hallucination map", True), (" delivered with every SR output", False)]])
-set_paras(shape(s8, "LText 1"), ["Super-Resolution for Port Intelligence", "Sharper views, delivered with a hallucination check"])
-notes(s8, "Limitations: the acquisition gap between SPOT and Sentinel-2, the small number of detectable objects in the test "
+    [("Multi-image SR", True), (" for static port infrastructure", False)],
+    [("SEN2SR", True), (" (ESA OpenSR) as a further baseline", False)],
+    [("A hallucination map", True), (" delivered with every SR output", False)],
+    [("Wider picture: ", True), ("SR chips for dark-vessel checks (project 1), not as bathymetry input (project 3)", False)]])
+set_paras(shape(s8, "Title 1"), ["Conclusions, limitations and next steps"])
+set_paras(shape(s8, "Pic Label"), ["CONCLUSIONS"])
+for i, (t, b) in enumerate([
+        ("Domain matters more than architecture", f"Same network: US-trained Satlas hallucinates {100 * s(G, 'satlas', 'hallucination'):.0f} % "
+                                                  "of Gulf patches; Real-ESRGAN weights fine-tune best"),
+        ("Two models, two jobs", f"L1: reliable, +{c_l1.d_psnr:.2f} dB. GAN: vessels per port image "
+                                 f"{ports.loc['bicubic', 'n_ship']:.1f} → {ports.loc['ft_gan', 'n_ship']:.1f}, texture not evidence"),
+        ("Use SR as a visual aid", "Every output delivered with a hallucination check")]):
+    set_paras(shape(s8, f"LText {i}"), [t, b])
+notes(s8, "Conclusions. First, the training domain matters more than the architecture: Satlas and Real-ESRGAN share the same "
+          "network, but US-only pretraining fails in the Gulf. Second, fidelity-oriented SR is reliable but gains only "
+          f"{c_l1.d_psnr:.2f} dB; GAN SR surfaces more vessels at the ports, but its texture is not evidence. Third, SR should be "
+          "used as a visual aid, with every output accompanied by a hallucination check.\n\n"
+          "Limitations: the acquisition gap between SPOT and Sentinel-2, the small number of detectable objects in the test "
           "tiles, and the non-commercial licence of the reference imagery, which is suitable for research but not for a product.\n\n"
           "Position in the wider picture: project 1 identifies dark vessels from SAR and AIS; super-resolution could support an "
           "analyst inspecting optical image chips of those candidates, provided each output carries a hallucination flag. "
           "Project 3, bathymetry, should not use super-resolved imagery as input, because depth retrieval depends on the "
-          "original reflectance values.")
+          "original reflectance values.\n\nThen switch to the live demonstration (run_demo.ps1: before/after slider over "
+          "Khalifa Port, Jebel Ali and Zayed Port) and take questions.")
 
-# ---------------- 14. conclusions (dark closing slide)
-set_paras(shape(end_slide, "Title 1"), ["Conclusions"])
-sub = shape(end_slide, "Subtitle 2")
-sub.top, sub.height = Inches(4.3), Inches(1.7)
-set_paras(sub, ["1   The training domain matters more than the architecture: US-only pretraining fails in the Gulf",
-                f"2   Fidelity-oriented SR is reliable but gains only {c_l1.d_psnr:.2f} dB; GAN SR surfaces more vessels at ports",
-                "3   SR should be used as a visual aid, with every output accompanied by a hallucination check"])
-for p in sub.text_frame.paragraphs:
-    for r in p.runs:
-        r.font.size = Pt(18)
-set_paras(shape(end_slide, "Presenter"), ["Demonstration: Streamlit app (run_demo.ps1)  |  Code, data scripts and results in the project repository  |  Questions"])
-shape(end_slide, "Presenter").top = Inches(6.35)
-notes(end_slide, "Conclude with the three findings, then switch to the live demonstration (before/after slider over Khalifa Port, "
-                 "Jebel Ali and Zayed Port) and take questions.")
+# backup slides: hidden in the slide show, kept for questions
+for sl in (data_slide, abl_slide, s6, s7, portview_slide):
+    t = shape(sl, "Title 1")
+    set_paras(t, ["Backup: " + t.text_frame.text])
+    sl._element.set("show", "0")
 
-# final order: title, problem, data, pipeline, build/reuse, ablation, results, gallery, close-up, hallucination,
-#              port views, vessels, limitations, conclusions
-order_src = [0, 1, 8, 2, 3, 9, 4, 10, 5, 6, 11, 12, 7, 13]
+# final order: title, problem, pipeline, build/reuse, results, gallery + hallucination, ports, conclusions;
+#              then hidden backup: data alignment, ablation, Sharjah close-up, hallucination map, port views
+order_src = [0, 1, 2, 3, 4, 10, 12, 7, 8, 9, 5, 6, 11]
 ids = list(prs.slides._sldIdLst)
 for el in ids:
     prs.slides._sldIdLst.remove(el)
