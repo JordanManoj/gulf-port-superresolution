@@ -43,6 +43,7 @@ per_tile = pd.read_csv(os.path.join(MET, "per_tile.csv"))
 abl = {k: pd.read_json(os.path.join(ROOT, "results", "training", f"ablation_l1_{k}", "log.json"))
        for k in ["realesrgan", "satlas", "scratch"]}
 abl_best = {k: v[v.it > 0].val_psnr.max() for k, v in abl.items()}
+abl_start = {k: v[v.it == 0].val_psnr.iloc[0] for k, v in abl.items()}
 G, T = "gulf_test", "test"
 n_ref_test = int(ci.loc[(T, "bicubic"), "det_ref_objects"])
 
@@ -241,6 +242,7 @@ abl_slide = duplicate_slide(prs, 1)       # backup: initialisation ablation char
 gallery_slide = duplicate_slide(prs, 5)   # main:   all methods on Gulf tiles + hallucination
 portview_slide = duplicate_slide(prs, 5)  # backup: port views with detections
 port_slide = duplicate_slide(prs, 1)      # main:   ports, views and vessels found after SR
+metric_slide = duplicate_slide(prs, 3)    # backup: how PSNR, SSIM and LPIPS are read
 s1, s2, s3, s4, s5, s6, s7, s8 = [prs.slides[i] for i in range(8)]
 c_l1 = ci.loc[(G, "ft_l1")]
 d_scr = abl_best["realesrgan"] - abl_best["scratch"]
@@ -340,7 +342,7 @@ for nm in ["Scratch", "Scratch Accent", "Fallback", "Fallback Accent"]:
 set_paras(shape(s4, "Scratch"), ["WHY NOT TRAIN FROM SCRATCH: MEASURED",
                                  f"Same data, loss and 1,500 iterations; only the starting weights differ. Validation PSNR: "
                                  f"Real-ESRGAN {abl_best['realesrgan']:.1f} dB, Satlas {abl_best['satlas']:.1f} dB, random "
-                                 f"{abl_best['scratch']:.1f} dB. US satellite weights lose to generic photo weights."])
+                                 f"{abl_best['scratch']:.1f} dB. Satlas must first unlearn its US colours and vegetation."])
 set_paras(shape(s4, "Fallback"), ["WHY NOT DIFFUSION OR MULTI-IMAGE SR",
                                   "Diffusion models exceed the 4 GB GPU budget and hallucinate more in published benchmarks. Multi-image "
                                   "SR fails on vessels that move between passes; it is the next step for static infrastructure."])
@@ -388,9 +390,9 @@ ch.category_axis.axis_title.text_frame.paragraphs[0].runs[0].font.bold = False
 set_paras(shape(abl_slide, "Relevance Label"), ["WHAT THE ABLATION SHOWS"])
 set_paras(shape(abl_slide, "Relevance Body"), [
     [("Identical data, loss and 1,500 iterations; ", False), ("only the initial weights differ", True)],
-    [("Real-ESRGAN: ", True), (f"{abl_best['realesrgan']:.1f} dB; starts high and continues to improve", False)],
-    [("Satlas: ", True), (f"{abl_best['satlas']:.1f} dB; satellite weights, but trained on US imagery only", False)],
-    [("Random: ", True), (f"{abl_best['scratch']:.1f} dB and still rising; would require far more data and compute", False)],
+    [("Real-ESRGAN: ", True), (f"{abl_start['realesrgan']:.1f} → {abl_best['realesrgan']:.1f} dB; general photo skills transfer", False)],
+    [("Satlas: ", True), (f"{abl_start['satlas']:.1f} → {abl_best['satlas']:.1f} dB; must unlearn its US-only prior", False)],
+    [("Random: ", True), (f"{abl_start['scratch']:.1f} → {abl_best['scratch']:.1f} dB; would need far more data and compute", False)],
     [("Decision: ", True), ("fine-tune from Real-ESRGAN weights", False)]])
 notes(abl_slide, "This addresses the question from the first interview on pre-trained models. Identical data (1,607 pairs), "
                  "loss and number of iterations; only the initial weights differ.\n\n"
@@ -425,10 +427,13 @@ set_paras(shape(s5, "H"), ["Hallucination",
                            f"Gulf patches flagged: Satlas {100 * s(G, 'satlas', 'hallucination'):.0f} %, GAN {100 * s(G, 'ft_gan', 'hallucination'):.0f} %, "
                            f"Real-ESRGAN {100 * s(G, 'realesrgan', 'hallucination'):.0f} %, L1 {100 * s(G, 'ft_l1', 'hallucination'):.0f} %. "
                            f"Only the L1 model is close to bicubic."])
-set_paras(shape(s5, "Footnote"), ["13 held-out Gulf tiles (never used in training) / 120 global WorldStrat test tiles. SSIM, LPIPS and "
+set_paras(shape(s5, "Footnote"), ["PSNR: pixel accuracy; SSIM: structural similarity; LPIPS: perceptual distance (lower looks more real). "
+                                  "13 held-out Gulf tiles (never used in training) / 120 global WorldStrat test tiles. SSIM, LPIPS and "
                                   "hallucination on Gulf tiles. SR colours harmonised to the input before scoring; confidence intervals "
                                   "from 10,000 paired bootstrap resamples. Source: results/metrics/per_tile_summary.csv, bootstrap_ci.csv."])
-notes(s5, "These results describe a trade-off rather than a single ranking.\n\n"
+notes(s5, "These results describe a trade-off rather than a single ranking. PSNR and SSIM measure accuracy against the SPOT "
+          "reference (higher is better); LPIPS measures how real the image looks to a deep network (lower is better). "
+          "(Backup slide: how the metrics are read.)\n\n"
           f"Fidelity: only the L1 fine-tuned model exceeds bicubic, by {c_l1.d_psnr:.2f} dB on Gulf tiles. The bootstrap interval "
           "excludes zero, so the gain is genuine, but it is small. This is consistent with the literature: super-resolution "
           "between real Sentinel-2 and SPOT imagery is considerably harder than on synthetic benchmarks.\n\n"
@@ -599,15 +604,46 @@ notes(s8, "Conclusions. First, the training domain matters more than the archite
           "original reflectance values.\n\nThen switch to the live demonstration (run_demo.ps1: before/after slider over "
           "Khalifa Port, Jebel Ali and Zayed Port) and take questions.")
 
+# ---------------- backup: how the image-quality metrics are read
+best = lambda col, f: max(names, key=lambda n: f * s(G, n[0], col))  # noqa: E731
+set_paras(shape(metric_slide, "Title 1"), ["Accuracy and realism are measured separately, and no method wins both"])
+tb = shape(metric_slide, "Build vs Reuse Table")
+resize_rows(tb.table, 4, [1, 2, 2])
+for j, v in enumerate(["Metric", "What it measures", "Best on Gulf tiles"]):
+    set_cell(tb.table.cell(0, j), v)
+for i, (m, what, col, f, fmt) in enumerate([
+        ("PSNR (dB) ↑", "Accuracy: average pixel error against SPOT", "psnr", 1, "{:.2f} dB"),
+        ("SSIM ↑", "Accuracy: whether edges, shapes and layout line up", "ssim", 1, "{:.3f}"),
+        ("LPIPS ↓", "Realism: how different it looks to a deep network", "lpips", -1, "{:.3f}")], start=1):
+    n = best(col, f)
+    for j, v in enumerate([m, what, f"{n[1]}, {fmt.format(s(G, n[0], col))} (bicubic {fmt.format(s(G, 'bicubic', col))})"]):
+        set_cell(tb.table.cell(i, j), v)
+for i, row in enumerate(tb.table.rows):
+    row.height = Inches(0.45)
+for col, w in zip(tb.table.columns, [1.9, 5.4, 5.03]):
+    col.width = Inches(w)
+for nm in ["Scratch", "Scratch Accent", "Fallback", "Fallback Accent"]:
+    shape(metric_slide, nm).top = Inches(4.3)
+set_paras(shape(metric_slide, "Scratch"), ["THE PERCEPTION-DISTORTION TRADE-OFF",
+                                           "Blau and Michaeli (2018): minimising pixel error and maximising realism conflict. "
+                                           "The L1 model wins accuracy, the GAN model wins realism; Satlas loses on all three."])
+set_paras(shape(metric_slide, "Fallback"), ["WHERE THE METRICS ARE USED",
+                                            "Only on WorldStrat tiles, which have a SPOT reference, after colour matching. The ports "
+                                            "have no reference, so they use detections, input consistency and stability across dates."])
+notes(metric_slide, "PSNR and SSIM measure accuracy against the SPOT reference; LPIPS measures perceptual similarity with a deep "
+                    "network, so lower means it looks more like the real image. No method wins all three, which is the "
+                    "perception-distortion trade-off, and it is why hallucination is measured separately: a realistic-looking "
+                    "image can still be wrong.")
+
 # backup slides: hidden in the slide show, kept for questions
-for sl in (data_slide, abl_slide, s6, s7, portview_slide):
+for sl in (data_slide, abl_slide, metric_slide, s6, s7, portview_slide):
     t = shape(sl, "Title 1")
     set_paras(t, ["Backup: " + t.text_frame.text])
     sl._element.set("show", "0")
 
 # final order: title, problem, pipeline, build/reuse, results, gallery + hallucination, ports, conclusions;
-#              then hidden backup: data alignment, ablation, Sharjah close-up, hallucination map, port views
-order_src = [0, 1, 2, 3, 4, 10, 12, 7, 8, 9, 5, 6, 11]
+#              then hidden backup: data alignment, ablation, metrics, Sharjah close-up, hallucination map, port views
+order_src = [0, 1, 2, 3, 4, 10, 12, 7, 8, 9, 13, 5, 6, 11]
 ids = list(prs.slides._sldIdLst)
 for el in ids:
     prs.slides._sldIdLst.remove(el)
