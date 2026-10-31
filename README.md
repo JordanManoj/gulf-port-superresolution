@@ -21,7 +21,7 @@ Can deep-learning super-resolution turn free 10 m Sentinel-2 imagery into 2.5 m 
 10. [Setup and how to run](#10-setup-and-how-to-run)
 11. [Repository layout](#11-repository-layout)
 
-Further reading: [`docs/PROJECT_WALKTHROUGH.md`](docs/PROJECT_WALKTHROUGH.md) (the whole project as a story: what I tried, what changed and why), [`DECISIONS.md`](DECISIONS.md) (dated log of every decision and obstacle), [`docs/RESEARCH.md`](docs/RESEARCH.md) (literature with sources), [`docs/TECHNICAL_EXPLAINER.md`](docs/TECHNICAL_EXPLAINER.md) (every component, plain then technical), [`docs/QA_PREP.md`](docs/QA_PREP.md) (likely questions and answers), [`data/README.md`](data/README.md) (data sources, licences, how to re-create).
+Data sources, licences and how to re-create the data: [`data/README.md`](data/README.md). Slides: [`presentation/Super-Resolution_for_Port_Intelligence.pptx`](presentation/Super-Resolution_for_Port_Intelligence.pptx).
 
 ---
 
@@ -41,7 +41,7 @@ Target area: the Arabian Gulf, specifically Khalifa Port, Jebel Ali and Zayed Po
 
 ## 2. Research
 
-Full notes with sources are in [`docs/RESEARCH.md`](docs/RESEARCH.md): how and where I searched (section 0), a model selection matrix covering every candidate considered (section 10), where every model and dataset came from (section 11), and what the literature predicted vs what my experiments showed (section 12). The points that shaped the design:
+Before building, I read the original papers, documentation and repositories for every model, dataset and metric used (sources in the acknowledgements below). The points that shaped the design:
 
 - **Sentinel-2 RGB is 10 m**; ×4 SR to 2.5 m is the community standard (OpenSR, Satlas, WorldStrat benchmarks).
 - **Single-image vs multi-image SR:** multi-image SR uses several revisits but needs careful co-registration and cloud masking; single-image SR is simpler and directly comparable with the pretrained models I wanted to test. I chose single-image ×4.
@@ -146,11 +146,11 @@ Red = patch moved away from both the input and the reference (hallucinated); yel
 ## 8. AI usage
 
 I used an AI coding assistant throughout this project, and I want to be explicit about where:
-- **Research:** finding and summarising papers and documentation (WorldStrat, Real-ESRGAN, Satlas, OpenSR-test, DOTA). I checked the sources linked in `docs/RESEARCH.md`.
+- **Research:** finding and summarising papers and documentation (WorldStrat, Real-ESRGAN, Satlas, OpenSR-test, DOTA). I checked every claim against the original sources.
 - **Code:** drafting scripts (downloader, training loop, evaluation, figures, demo, slide builder) and debugging (fp16 NaNs, memory exhaustion, tile seams, PowerShell log encoding).
 - **Writing:** drafting documentation and slide text.
 
-What I did not delegate: every number in this repository comes from running the code on this machine, and the failures are reported as they happened (see `DECISIONS.md`). The design choices (held-out Gulf set, frozen independent detector, hallucination metrics, initialisation ablation, bootstrap CIs) were each checked against the results before being kept.
+What I did not delegate: every number in this repository comes from running the code on this machine, and the failures are reported as they happened (section 6, "What worked, what did not"). The design choices (held-out Gulf set, frozen independent detector, hallucination metrics, initialisation ablation, bootstrap CIs) were each checked against the results before being kept.
 
 ## 9. Pipeline
 
@@ -219,7 +219,6 @@ Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN
 
 ```
 ├── README.md                  this file
-├── DECISIONS.md               dated decision and obstacle log
 ├── requirements.txt           pinned dependencies
 ├── run_pipeline.ps1           full offline pipeline in a visible window
 ├── run_eval.ps1               evaluation-only re-run
@@ -228,17 +227,10 @@ Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN
 ├── configs/                   training configs (ablation, ft_l1, ft_gan)
 ├── data/README.md             data sources, licences, re-creation (data itself not committed)
 ├── demo/app.py                Streamlit demo
-├── docs/                      every document also as .docx (python scripts/md_to_docx.py)
-│   ├── PROJECT_WALKTHROUGH.md what I built, tried, changed and why
-│   ├── RESEARCH.md            literature review with sources
-│   ├── TECHNICAL_EXPLAINER.md every component explained
-│   ├── QA_PREP.md             likely questions and answers
-│   └── DEMO_RECORDING.md      outline for the recorded demo
 ├── presentation/
 │   ├── build_deck.py          builds the deck from the template + results
 │   ├── template_original.pptx
 │   └── Super-Resolution_for_Port_Intelligence.pptx
-├── scripts/md_to_docx.py      Markdown -> Word for the docs
 ├── results/
 │   ├── figures/               all figures used in README and slides
 │   ├── metrics/               per-tile metrics, summaries, bootstrap CIs, port metrics
