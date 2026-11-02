@@ -16,10 +16,9 @@ Can deep-learning super-resolution turn free 10 m Sentinel-2 imagery into 2.5 m 
 5. [Data](#5-data)
 6. [Results](#6-results)
 7. [Limitations](#7-limitations)
-8. [AI usage](#8-ai-usage)
-9. [Pipeline](#9-pipeline)
-10. [Setup and how to run](#10-setup-and-how-to-run)
-11. [Repository layout](#11-repository-layout)
+8. [Pipeline](#8-pipeline)
+9. [Setup and how to run](#9-setup-and-how-to-run)
+10. [Repository layout](#10-repository-layout)
 
 Data sources, licences and how to re-create the data: [`data/README.md`](data/README.md). Slides: [`presentation/Super-Resolution_for_Port_Intelligence.pptx`](presentation/Super-Resolution_for_Port_Intelligence.pptx).
 
@@ -143,16 +142,7 @@ Red = patch moved away from both the input and the reference (hallucinated); yel
 - **Compute.** GTX 1650 (4 GB): batch 4-8, 4,000 + 3,000 fine-tuning iterations. Longer training would likely help the GAN.
 - **Licence.** SPOT imagery in WorldStrat is CC BY-NC 4.0: this work is non-commercial research.
 
-## 8. AI usage
-
-I used an AI coding assistant throughout this project, and I want to be explicit about where:
-- **Research:** finding and summarising papers and documentation (WorldStrat, Real-ESRGAN, Satlas, OpenSR-test, DOTA). I checked every claim against the original sources.
-- **Code:** drafting scripts (downloader, training loop, evaluation, figures, demo, slide builder) and debugging (fp16 NaNs, memory exhaustion, tile seams, PowerShell log encoding).
-- **Writing:** drafting documentation and slide text.
-
-What I did not delegate: every number in this repository comes from running the code on this machine, and the failures are reported as they happened (section 6, "What worked, what did not"). The design choices (held-out Gulf set, frozen independent detector, hallucination metrics, initialisation ablation, bootstrap CIs) were each checked against the results before being kept.
-
-## 9. Pipeline
+## 8. Pipeline
 
 ```mermaid
 flowchart LR
@@ -180,7 +170,7 @@ SPOT ─► 2.5 m ─► colour-match ─► register ─► mask ─► referen
                     pixel metrics + hallucination maps + detector agreement + port checks
 ```
 
-## 10. Setup and how to run
+## 9. Setup and how to run
 
 Tested on Windows 11, Python 3.11, NVIDIA GTX 1650 (4 GB), CUDA 12.1.
 
@@ -215,7 +205,7 @@ python presentation/build_deck.py
 
 Training time on the GTX 1650: ablation 3 × 27-29 min, L1 fine-tune 76 min, GAN fine-tune 56 min.
 
-## 11. Repository layout
+## 10. Repository layout
 
 ```
 ├── README.md                  this file
